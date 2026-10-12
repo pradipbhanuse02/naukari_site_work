@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Naukri Job Exporter",
+  "version": "1.0.0",
+  "description": "Search Naukri jobs and export visible listing details to CSV.",
+  "permissions": [
+    "tabs",
+    "storage",
+    "downloads",
+    "offscreen"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": [
+    "https://www.naukri.com/*"
+  ],
+  "action": {
+    "default_title": "Naukri Job Exporter",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.naukri.com/*"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "js": [
+        "keyword-matcher.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

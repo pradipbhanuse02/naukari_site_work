@@ -1,0 +1,38 @@
+.naukri-keyword-match-badge {
+  display: inline-block;
+  margin: 8px 0 0;
+  padding: 4px 8px;
+  border: 1px solid #b7c7ff;
+  border-radius: 4px;
+  color: #1d4ed8;
+  background: #eef2ff;
+  font: 600 12px/1.4 Arial, sans-serif;
+}
+
+.naukri-keyword-match-badge[data-qualifies="true"] {
+  border-color: #86d3a3;
+  color: #176b37;
+  background: #eaf8ef;
+}
+
+.naukri-keyword-match-badge::after {
+  content: attr(data-reason);
+  display: block;
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+#naukri-keyword-match-summary {
+  position: fixed;
+  z-index: 2147483647;
+  right: 16px;
+  bottom: 16px;
+  max-width: calc(100vw - 32px);
+  padding: 9px 12px;
+  border: 1px solid #275df5;
+  border-radius: 6px;
+  color: #fff;
+  background: #275df5;
+  box-shadow: 0 2px 8px #0003;
+  font: 600 13px/1.4 Arial, sans-serif;
+}
