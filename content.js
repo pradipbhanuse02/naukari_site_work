@@ -130,6 +130,36 @@ function getVisibleFormFields(root) {
     .filter((field) => isVisible(field) && !field.disabled && field.type !== "hidden");
 }
 
+function getApplyChatContext() {
+  const messageInput = [...document.querySelectorAll(
+    'input[placeholder*="message" i], textarea[placeholder*="message" i], [contenteditable="true"][aria-label*="message" i]'
+  )].find(isVisible);
+  if (!messageInput) return { panel: null, prompts: [] };
+
+  let panel = messageInput.parentElement;
+  for (let depth = 0; panel && depth < 8; depth += 1, panel = panel.parentElement) {
+    if (/(chat|conversation|apply|message|drawer|panel|modal)/i.test(
+      `${panel.id} ${typeof panel.className === "string" ? panel.className : ""}`
+    )) {
+      break;
+    }
+  }
+  panel ??= messageInput.parentElement;
+  if (!panel) return { panel: null, prompts: [] };
+
+  const ignored = /^(?:type message here|send|apply|close|cancel|back)$/i;
+  const prompts = [];
+  for (const element of panel.querySelectorAll("*")) {
+    if (!isVisible(element) || element.children.length > 0) continue;
+    const text = element.innerText?.trim().replace(/\s+/g, " ");
+    if (!text || text.length > 240 || ignored.test(text)) continue;
+    if (/^(hi\b|hello\b|dear\b|thank you for showing interest|kindly answer all)/i.test(text)) continue;
+    if (element.matches("input, textarea, button, a, select, option")) continue;
+    if (!prompts.includes(text)) prompts.push(text);
+  }
+  return { panel, prompts };
+}
+
 function isFieldAnswered(field) {
   if (field.type === "checkbox" || field.type === "radio") {
     if (field.type === "radio" && field.name) {
@@ -143,7 +173,9 @@ function isFieldAnswered(field) {
 
 function findExternalApplicationLink() {
   return [...document.querySelectorAll("a[href]")]
-    .filter((link) => isVisible(link) && link.href && new URL(link.href).hostname !== "www.naukri.com")
+    .filter((link) => isVisible(link)
+      && /^https?:$/.test(new URL(link.href).protocol)
+      && new URL(link.href).hostname !== "www.naukri.com")
     .find((link) => /apply|career|employer|company website|company site/i.test(link.innerText.trim()));
 }
 
@@ -163,6 +195,21 @@ function waitForApplicationResult(timeoutMs = 12000) {
   });
 }
 
+async function waitForApplySurface(timeoutMs = 6000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const dialog = [...document.querySelectorAll('dialog[open], [role="dialog"], [class*="modal" i]')]
+      .find(isVisible);
+    const chatContext = getApplyChatContext();
+    if (dialog || chatContext.prompts.length) return { dialog, chatContext };
+    if (hasApplicationSuccess()) return { dialog: null, chatContext, applied: true };
+    await new Promise((resolve) => window.setTimeout(resolve, 300));
+  }
+  const dialog = [...document.querySelectorAll('dialog[open], [role="dialog"], [class*="modal" i]')]
+    .find(isVisible);
+  return { dialog, chatContext: getApplyChatContext(), applied: hasApplicationSuccess() };
+}
+
 async function attemptQuickApply(jobTitle) {
   if (hasCaptcha()) {
     return {
@@ -171,8 +218,17 @@ async function attemptQuickApply(jobTitle) {
       questions: []
     };
   }
+  if (/job (?:is )?(?:no longer available|expired|closed)|position has been filled|this job is inactive/i
+    .test(document.body.innerText)) {
+    return {
+      status: "Skipped",
+      reason: "Not applied: Naukri indicates this job is closed, expired, inactive, or no longer available.",
+      questions: [],
+      destination: ""
+    };
+  }
 
-  const normalizeTitle = (value) => value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "");
+  const normalizeTitle = (value) => String(value ?? "").toLocaleLowerCase().replace(/[^a-z0-9]+/g, "");
   const expectedTitle = normalizeTitle(jobTitle);
   const heading = [...document.querySelectorAll("h1")]
     .find((element) => isVisible(element) && normalizeTitle(element.innerText));
@@ -200,7 +256,7 @@ async function attemptQuickApply(jobTitle) {
   }
   const headingRect = heading.getBoundingClientRect();
   const quickApply = actions
-    .filter((element) => /^quick\s*apply$/i.test(actionText(element)))
+    .filter((element) => /^(?:quick\s*apply|apply)$/i.test(actionText(element)))
     .map((element) => {
       const rect = element.getBoundingClientRect();
       return {
@@ -226,30 +282,35 @@ async function attemptQuickApply(jobTitle) {
   }
 
   quickApply.element.click();
-  await new Promise((resolve) => window.setTimeout(resolve, 500));
-  if (hasApplicationSuccess()) {
+  const applySurface = await waitForApplySurface();
+  if (applySurface.applied) {
     return { status: "Applied", reason: "Naukri confirmed the application was submitted." };
   }
 
-  const dialog = [...document.querySelectorAll('dialog[open], [role="dialog"], [class*="modal" i]')]
-    .find(isVisible);
-  if (dialog) {
-    if (hasCaptcha(dialog)) {
+  const { dialog, chatContext } = applySurface;
+  const applyChatPrompts = chatContext.prompts;
+  if (dialog || applyChatPrompts.length) {
+    const formRoot = dialog ?? chatContext.panel;
+    if (hasCaptcha(formRoot)) {
       return {
         status: "Skipped",
         reason: "Not applied: the Quick Apply form requires CAPTCHA completion.",
         questions: []
       };
     }
-    if (dialog.querySelector('input[type="file"]')) {
+    if (formRoot.querySelector('input[type="file"]')) {
       return {
         status: "Skipped",
         reason: "Not applied: the Quick Apply form requires a file upload that needs manual selection.",
         questions: []
       };
     }
-    const fields = getVisibleFormFields(dialog);
-    const questions = [...new Set(fields.map(getFieldPrompt).filter(Boolean))];
+    const fields = getVisibleFormFields(formRoot)
+      .filter((field) => !/message/i.test(field.getAttribute("placeholder") ?? ""));
+    const questions = [...new Set([
+      ...fields.map(getFieldPrompt).filter(Boolean),
+      ...applyChatPrompts
+    ])];
     const unanswered = fields.filter((field) =>
       (field.required || field.getAttribute("aria-required") === "true")
       && !isFieldAnswered(field)
@@ -259,19 +320,22 @@ async function attemptQuickApply(jobTitle) {
       || /\?$/.test(getFieldPrompt(field))
       || /why|describe|explain|tell us|cover letter|motivat/i.test(getFieldPrompt(field))
     );
-    const needsManualAnswers = unanswered.length > 0 || questionFields.length > 0;
+    const needsManualAnswers = unanswered.length > 0 || questionFields.length > 0 || applyChatPrompts.length > 0;
     if (needsManualAnswers) {
       const unansweredPrompts = unanswered.map(getFieldPrompt);
+      const manualPrompts = applyChatPrompts.length
+        ? applyChatPrompts
+        : questionFields.map(getFieldPrompt);
       return {
         status: "Skipped",
         reason: unansweredPrompts.length
           ? `Not applied: required application responses need your input: ${unansweredPrompts.join("; ")}.`
-          : `Not applied: the form asks for manual answers: ${questionFields.map(getFieldPrompt).join("; ")}.`,
+          : `Not applied: the form asks for manual answers: ${manualPrompts.join("; ")}.`,
         questions,
         destination: ""
       };
     }
-    const submit = [...dialog.querySelectorAll("button, [role='button']")]
+    const submit = [...formRoot.querySelectorAll("button, [role='button']")]
       .filter((element) => isVisible(element) && !element.disabled)
       .find((element) => /^(apply|submit|submit application)$/i.test(actionText(element)));
     if (submit) {
@@ -299,8 +363,10 @@ async function attemptQuickApply(jobTitle) {
     ? { status, reason: "Naukri confirmed the application was submitted.", questions: [], destination: "" }
     : {
       status,
-      reason: "Not applied: Quick Apply was clicked, but no confirmation or application form appeared. The result is uncertain; stopped to avoid a duplicate.",
-      questions: [],
+      reason: applyChatPrompts.length
+        ? `Not applied: Naukri requested an answer in its Apply chat. Prompts found: ${applyChatPrompts.join("; ")}. Manual answers are required.`
+        : "Not applied: Quick Apply was clicked, but no confirmation or application form appeared. The result is uncertain; stopped to avoid a duplicate.",
+      questions: applyChatPrompts,
       destination: ""
     };
 }
@@ -316,7 +382,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       (result) => sendResponse(result),
       (error) => sendResponse({
         status: "Failed",
-        reason: `Quick Apply failed: ${error.message}`
+        reason: `Not applied: Quick Apply inspection failed (${error?.message || String(error)}).`,
+        questions: [],
+        destination: ""
       })
     );
     return true;

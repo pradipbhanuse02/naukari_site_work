@@ -43,10 +43,25 @@ function waitForTabComplete(tabId, timeoutMs = 30000) {
 }
 
 async function requestQuickApply(tabId, jobTitle) {
-  return chrome.tabs.sendMessage(tabId, {
-    type: "attempt-naukri-quick-apply",
-    jobTitle
-  });
+  let lastError;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const response = await chrome.tabs.sendMessage(tabId, {
+        type: "attempt-naukri-quick-apply",
+        jobTitle
+      });
+      if (!response || typeof response.status !== "string") {
+        throw new Error("The Naukri page responded without application status details.");
+      }
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  throw new Error(
+    `The Naukri page did not return a Quick Apply result after 5 attempts. Reload the extension, refresh the Naukri tab, and try again. Last error: ${lastError?.message || String(lastError)}`
+  );
 }
 
 async function saveApplyProgress(results, state) {
@@ -123,7 +138,10 @@ async function performApplyToJobs(jobs) {
         const loadedTab = await waitForTabComplete(tabId);
         if (!loadedTab.url || new URL(loadedTab.url).hostname !== "www.naukri.com") {
           job.applyStatus = "Skipped";
-          job.applyReason = "The job opened outside Naukri; no application was submitted.";
+          job.applyDestination = loadedTab.url || "";
+          job.applyReason = loadedTab.url
+            ? `Not applied: the job redirected to an external application site. Apply manually at ${loadedTab.url}`
+            : "Not applied: the job redirected away from Naukri, but the destination URL could not be read.";
         } else {
           const response = await requestQuickApply(tabId, job.title);
           job.applyStatus = response?.status || "Failed";
@@ -196,7 +214,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return { results };
     })().then(
       (result) => sendResponse({ ok: true, ...result }),
-      (error) => sendResponse({ ok: false, error: error.message })
+      (error) => sendResponse({
+        ok: false,
+        error: error?.message || `The application worker failed: ${String(error)}`
+      })
     );
     return true;
   }

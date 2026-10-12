@@ -3,7 +3,8 @@ const keywordInput = document.querySelector("#keyword");
 const searchButton = searchForm.querySelector('button[type="submit"]');
 const searchCountDisplay = document.querySelector("#search-count");
 const jobPostCountDisplay = document.querySelector("#job-post-count");
-const matchedJobCountDisplay = document.querySelector("#matched-job-count");
+const jobsAbove20CountDisplay = document.querySelector("#jobs-above-20-count");
+const jobsThreeSkillsCountDisplay = document.querySelector("#jobs-three-skills-count");
 const collectButton = document.querySelector("#collect");
 const applyButton = document.querySelector("#apply");
 const exportButton = document.querySelector("#export");
@@ -27,7 +28,8 @@ async function loadCounts() {
     const stored = await getLocalStorage().get([
       "searchesLaunched",
       "jobsFoundLastScan",
-      "jobsSelectedLastScan",
+      "jobsAbove20LastScan",
+      "jobsWithThreeSkillsLastScan",
       "applicationHistory"
     ]);
     const searchesLaunched = Number.isSafeInteger(stored.searchesLaunched) && stored.searchesLaunched >= 0
@@ -36,12 +38,16 @@ async function loadCounts() {
     const jobsFoundLastScan = Number.isSafeInteger(stored.jobsFoundLastScan) && stored.jobsFoundLastScan >= 0
       ? stored.jobsFoundLastScan
       : 0;
-    const jobsSelectedLastScan = Number.isSafeInteger(stored.jobsSelectedLastScan) && stored.jobsSelectedLastScan >= 0
-      ? stored.jobsSelectedLastScan
+    const jobsAbove20LastScan = Number.isSafeInteger(stored.jobsAbove20LastScan) && stored.jobsAbove20LastScan >= 0
+      ? stored.jobsAbove20LastScan
+      : 0;
+    const jobsWithThreeSkillsLastScan = Number.isSafeInteger(stored.jobsWithThreeSkillsLastScan) && stored.jobsWithThreeSkillsLastScan >= 0
+      ? stored.jobsWithThreeSkillsLastScan
       : 0;
     searchCountDisplay.textContent = `1. Searches launched: ${searchesLaunched}`;
     jobPostCountDisplay.textContent = `2. Jobs found/scored (last scan): ${jobsFoundLastScan}`;
-    matchedJobCountDisplay.textContent = `3. Jobs selected (highest % or 3+ matched skills, last scan): ${jobsSelectedLastScan}`;
+    jobsAbove20CountDisplay.textContent = `3. Jobs above 20% (last scan): ${jobsAbove20LastScan}`;
+    jobsThreeSkillsCountDisplay.textContent = `4. Jobs with at least 3 matched keywords (last scan): ${jobsWithThreeSkillsLastScan}`;
     if (stored.applicationHistory && typeof stored.applicationHistory === "object") {
       applicationResultsByUrl = new Map(Object.entries(stored.applicationHistory));
     }
@@ -66,14 +72,21 @@ function renderJobs(jobs, keywords) {
       ...job,
       ...(applicationResultsByUrl.get(job.jobUrl) ?? {
         applyStatus: "Not attempted",
-        applyReason: "Not applied: Quick Apply has not been run for this job."
+        applyReason: "Not applied: Quick Apply has not been run for this job.",
+        applyQuestions: [],
+        applyDestination: ""
       })
     }));
-  csvJobs = rankedJobs.filter((job) => job.matchedSkills >= 1);
   const matchedJobs = rankedJobs
     .filter((job) => job.qualifies);
   collectedJobs = matchedJobs;
-  matchedJobCountDisplay.textContent = `3. Jobs selected (highest % or 3+ matched skills, last scan): ${matchedJobs.length}`;
+  const jobsAbove20 = rankedJobs.filter((job) =>
+    job.totalSkills > 0 && job.matchedSkills * 100 > job.totalSkills * 20
+  ).length;
+  const jobsWithThreeSkills = rankedJobs.filter((job) => job.matchedSkills >= 3).length;
+  jobsAbove20CountDisplay.textContent = `3. Jobs above 20% (last scan): ${jobsAbove20}`;
+  jobsThreeSkillsCountDisplay.textContent = `4. Jobs with at least 3 matched keywords (last scan): ${jobsWithThreeSkills}`;
+  csvJobs = rankedJobs.filter((job) => job.matchedSkills >= 1);
   exportButton.disabled = csvJobs.length === 0;
   applyButton.disabled = csvJobs.length === 0;
   jobResults.replaceChildren();
@@ -109,6 +122,12 @@ function renderJobs(jobs, keywords) {
     applicationStatus.className = "job-meta";
     applicationStatus.textContent = `Application: ${job.applyStatus} · ${getApplicationReason(job)}`;
     item.append(applicationStatus);
+    if (job.applyQuestions?.length) {
+      const questions = document.createElement("p");
+      questions.className = "job-meta";
+      questions.textContent = `Application form questions: ${job.applyQuestions.join("; ")}`;
+      item.append(questions);
+    }
 
     if (job.description) {
       const description = document.createElement("p");
@@ -119,6 +138,8 @@ function renderJobs(jobs, keywords) {
 
     jobResults.append(item);
   }
+
+  return { jobsAbove20, jobsWithThreeSkills };
 }
 
 async function collectJobsFromTab(tabId, keywords) {
@@ -155,12 +176,14 @@ async function collectFromActiveTab(showEmptyMessage = true) {
       csvJobs = [];
       applyButton.disabled = true;
       jobPostCountDisplay.textContent = "2. Jobs found/scored (last scan): 0";
-      matchedJobCountDisplay.textContent = "3. Jobs selected (highest % or 3+ matched skills, last scan): 0";
+      jobsAbove20CountDisplay.textContent = "3. Jobs above 20% (last scan): 0";
+      jobsThreeSkillsCountDisplay.textContent = "4. Jobs with at least 3 matched keywords (last scan): 0";
       exportButton.disabled = true;
       jobResults.replaceChildren();
       await getLocalStorage().set({
         jobsFoundLastScan: 0,
-        jobsSelectedLastScan: 0
+        jobsAbove20LastScan: 0,
+        jobsWithThreeSkillsLastScan: 0
       });
       setStatus("Enter at least one comma-separated skill keyword to filter jobs.");
       return true;
@@ -172,11 +195,12 @@ async function collectFromActiveTab(showEmptyMessage = true) {
       return false;
     }
 
-    renderJobs(response.jobs, keywords);
+    const scanCounts = renderJobs(response.jobs, keywords);
     try {
       await getLocalStorage().set({
         jobsFoundLastScan: response.jobs.length,
-        jobsSelectedLastScan: collectedJobs.length
+        jobsAbove20LastScan: scanCounts.jobsAbove20,
+        jobsWithThreeSkillsLastScan: scanCounts.jobsWithThreeSkills
       });
     } catch (error) {
       setStatus(`Jobs were collected, but the last-scan count could not be saved: ${error.message}`, true);
@@ -223,11 +247,13 @@ searchForm.addEventListener("submit", async (event) => {
       await storage.set({
         searchesLaunched: nextCount,
         jobsFoundLastScan: 0,
-        jobsSelectedLastScan: 0
+        jobsAbove20LastScan: 0,
+        jobsWithThreeSkillsLastScan: 0
       });
       searchCountDisplay.textContent = `1. Searches launched: ${nextCount}`;
       jobPostCountDisplay.textContent = "2. Jobs found/scored (last scan): 0";
-      matchedJobCountDisplay.textContent = "3. Jobs selected (highest % or 3+ matched skills, last scan): 0";
+      jobsAbove20CountDisplay.textContent = "3. Jobs above 20% (last scan): 0";
+      jobsThreeSkillsCountDisplay.textContent = "4. Jobs with at least 3 matched keywords (last scan): 0";
       collectedJobs = [];
       csvJobs = [];
       applyButton.disabled = true;
@@ -291,12 +317,18 @@ function buildCsv() {
     ["qualificationReason", "Selection Reason"],
     ["applyStatus", "Application Status"],
     ["applyReason", "Why Not Applied / Application Outcome"],
+    ["applyQuestions", "Application Form Questions"],
+    ["applyDestination", "External Application URL"],
     ["jobUrl", "Job URL"]
   ];
   const rows = [
     columns.map(([, heading]) => escapeCsv(heading)).join(","),
     ...csvJobs.map((job) => columns.map(([key]) => escapeCsv(
-      key === "applyReason" ? getApplicationReason(job) : job[key]
+      key === "applyReason"
+        ? getApplicationReason(job)
+        : key === "applyQuestions"
+          ? (job.applyQuestions ?? []).join("; ")
+          : job[key]
     )).join(","))
   ];
   return rows.join("\r\n");
@@ -321,7 +353,8 @@ applyButton.addEventListener("click", async () => {
       jobs: csvJobs.map((job) => ({ ...job }))
     });
     if (!response?.ok) {
-      throw new Error(response?.error || "Quick Apply could not be completed.");
+      throw new Error(response?.error
+        || "The extension background did not return application details. Reload the extension and inspect its service-worker errors at edge://extensions.");
     }
     for (const result of response.results) {
       applicationResultsByUrl.set(result.jobUrl, result);
@@ -352,11 +385,20 @@ applyButton.addEventListener("click", async () => {
     } catch (storageError) {
       setStatus(`Quick Apply run failed: ${error.message}; application results could not be read: ${storageError.message}`, true);
     }
-    csvJobs = csvJobs.map((job) => history[job.jobUrl] ?? ({
-      ...job,
-      applyStatus: "Not attempted",
-      applyReason: `Not applied: the Quick Apply run could not start or finish (${error.message}).`
-    }));
+    csvJobs = csvJobs.map((job) => {
+      const previous = history[job.jobUrl];
+      if (previous?.applyStatus && previous.applyStatus !== "Not attempted") {
+        return { ...job, ...previous };
+      }
+      return {
+        ...job,
+        ...(previous ?? {}),
+        applyStatus: "Not attempted",
+        applyReason: `Not applied: the Quick Apply run stopped before this job could be checked (${error.message}).`,
+        applyQuestions: previous?.applyQuestions ?? [],
+        applyDestination: previous?.applyDestination ?? ""
+      };
+    });
     for (const job of csvJobs) {
       applicationResultsByUrl.set(job.jobUrl, job);
     }
