@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Naukri CSV Apply Assistant",
+  "version": "1.0.0",
+  "description": "Open Naukri jobs from a CSV, apply saved recruiter answers, and keep application submission under your control.",
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*.naukri.com/*",
+    "https://naukri.com/*"
+  ],
+  "action": {
+    "default_title": "Naukri CSV Apply Assistant",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "service_worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.naukri.com/*",
+        "https://naukri.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

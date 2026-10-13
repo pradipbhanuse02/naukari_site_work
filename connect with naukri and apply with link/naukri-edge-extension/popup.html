@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Naukri Search Collector</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <h1>Naukri Search Collector</h1>
+      <p id="status" role="status">Checking this tab...</p>
+      <p id="count">0 jobs collected</p>
+      <div class="actions">
+        <button id="start" type="button">Collect all result pages</button>
+        <button id="stop" type="button" class="secondary">Stop</button>
+      </div>
+      <button id="export" type="button" class="secondary export">Download CSV</button>
+      <h2>Collected jobs</h2>
+      <ol id="jobs"></ol>
+      <p id="empty" class="muted">Collected jobs will appear here.</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

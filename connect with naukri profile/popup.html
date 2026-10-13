@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Naukri Job Search Assistant</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="eyebrow">NAUKRI ASSISTANT</span>
+        <h1>Find your next role</h1>
+        <p>Search with your existing Naukri account and try eligible jobs one at a time.</p>
+      </header>
+
+      <form id="search-form">
+        <label for="keyword">Job title or keywords</label>
+        <input id="keyword" name="keyword" type="search" placeholder="e.g. product manager" required maxlength="1000">
+        <span class="field-hint">Separate keywords with commas. Jobs above 20% match are marked for your review.</span>
+
+        <label for="location">Location <span class="optional">(optional)</span></label>
+        <input id="location" name="location" type="text" placeholder="e.g. Bengaluru" maxlength="60">
+
+        <button class="primary" type="submit">Search jobs on Naukri</button>
+        <button id="apply-top-match" class="secondary" type="button">Auto-apply until 1 success</button>
+        <span class="field-hint warning">Tries eligible jobs in match order. It only clicks a clear one-step Apply button, stops for forms or unclear results, and stops after one detected success.</span>
+      </form>
+
+      <a class="profile-link" href="https://www.naukri.com/" target="_blank" rel="noreferrer">Open Naukri to sign in or check your profile ↗</a>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <p id="scan-summary" class="scan-summary" role="status" aria-live="polite"></p>
+
+      <section class="activity" aria-labelledby="activity-heading">
+        <h2 id="activity-heading">Search and application activity</h2>
+        <ol id="activity-summary"></ol>
+        <ul id="activity-jobs"></ul>
+        <span class="field-hint">The extension records clear Naukri success/failure messages. Unclear results pause for manual review; it never fills or submits multi-step forms.</span>
+      </section>
+
+      <section class="history" aria-labelledby="history-heading">
+        <h2 id="history-heading">Recently applied</h2>
+        <ul id="application-list"></ul>
+        <button id="download-report" class="secondary" type="button">Download job report (CSV)</button>
+        <span class="field-hint">Exports all jobs in the latest scan plus activity totals, then clears that scan log. Application history remains.</span>
+      </section>
+
+      <footer>Automatic attempts can submit a one-step Naukri application. Review your profile before starting; multi-step forms are left for you.</footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

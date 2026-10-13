@@ -1,0 +1,115 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 410px;
+  max-height: 620px;
+  margin: 0;
+  color: #202124;
+  font: 13px/1.45 "Segoe UI", Arial, sans-serif;
+}
+
+main {
+  padding: 16px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.hint,
+#status {
+  color: #5f6368;
+}
+
+.file-label {
+  display: block;
+  margin: 14px 0 5px;
+  font-weight: 600;
+}
+
+input[type="file"] {
+  width: 100%;
+}
+
+.actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+button,
+.file-label {
+  border: 1px solid #dadce0;
+  border-radius: 5px;
+  background: white;
+  color: #202124;
+  cursor: pointer;
+  padding: 7px 9px;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+button.primary {
+  border-color: #0b57d0;
+  background: #0b57d0;
+  color: white;
+}
+
+button.secondary {
+  margin-top: 7px;
+}
+
+#status {
+  margin: 12px 0;
+  white-space: pre-wrap;
+}
+
+#jobs {
+  max-height: 345px;
+  overflow-y: auto;
+}
+
+.job {
+  border-top: 1px solid #dadce0;
+  padding: 10px 0;
+}
+
+.job-title {
+  font-weight: 600;
+}
+
+.job-url {
+  overflow-wrap: anywhere;
+  color: #5f6368;
+  font-size: 11px;
+}
+
+.answer {
+  display: block;
+  margin-top: 8px;
+}
+
+.answer label {
+  display: block;
+  margin-bottom: 3px;
+  font-weight: 600;
+}
+
+.answer input {
+  width: 100%;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  padding: 6px;
+}
+
+.answer small {
+  display: block;
+  color: #5f6368;
+  overflow-wrap: anywhere;
+}

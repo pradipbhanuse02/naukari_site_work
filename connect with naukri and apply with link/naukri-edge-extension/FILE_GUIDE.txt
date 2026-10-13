@@ -1,0 +1,210 @@
+NAUKRI SEARCH COLLECTOR - FILE AND FUNCTION GUIDE
+================================================
+
+WHAT THE EXTENSION DOES
+-----------------------
+This Edge extension reads job cards already shown on a Naukri search-results
+page, follows detected next-page links on the same Naukri site, removes
+duplicate job URLs, and saves the collected data in Edge extension storage.
+It can display the results and export them as a CSV file.
+
+You enter the search keywords on Naukri yourself. This extension does not
+create or submit a keyword search, access hidden/private APIs, or apply for
+jobs. It reads the rendered page content.
+
+FOLDER CONTENTS
+---------------
+
+1. manifest.json
+   Role:
+   The extension's configuration file. Edge reads it to learn the extension
+   version, permissions, popup, background service worker, and content script.
+
+   Important settings:
+   - manifest_version: 3 selects the current Chromium extension format.
+   - permissions: activeTab allows interaction with the tab the user uses;
+     storage allows the extension to save its collected results.
+   - host_permissions: limits the extension's website access to HTTPS Naukri
+     domains.
+   - action.default_popup: opens popup.html when the extension icon is clicked.
+   - background.service_worker: runs service-worker.js for collection workflow.
+   - content_scripts: loads content.js on matching Naukri pages after the page
+     has loaded.
+
+   This file has no JavaScript functions.
+
+2. popup.html
+   Role:
+   Defines the extension popup shown when its toolbar icon is clicked.
+
+   Important elements:
+   - #status displays instructions and collection progress.
+   - #count displays the number of unique jobs stored.
+   - #start starts collection from the currently open Naukri page.
+   - #stop stops an active collection.
+   - #export downloads the collected records as a CSV.
+   - #jobs displays up to 40 job links and their available details.
+   - #empty displays a message when there are no jobs yet.
+   - popup.css styles the popup.
+   - popup.js provides the popup's behavior.
+
+   This file has no JavaScript functions.
+
+3. popup.css
+   Role:
+   Styles the popup's layout, buttons, status, and job list.
+
+   Important selectors:
+   - body and main set the popup width and spacing.
+   - .actions lays out the Start and Stop controls.
+   - .secondary styles secondary buttons.
+   - .export adds spacing above the CSV button.
+   - #jobs and #jobs li style the scrollable results list.
+   - .detail and .muted style supporting information.
+
+   CSS selectors are style rules, not JavaScript functions.
+
+4. popup.js
+   Role:
+   Connects the popup interface to browser tabs, local extension storage, and
+   the background service worker.
+
+   Constants:
+   - STORAGE_KEY is the key used to read the saved collection from local
+     extension storage.
+   - statusElement, countElement, jobsElement, emptyElement, startButton,
+     stopButton, and exportButton refer to popup.html elements.
+
+   Functions:
+   - isNaukriUrl(value): returns true only for HTTPS URLs on naukri.com or one
+     of its subdomains. Used to enable collection only on Naukri pages.
+   - activeTab(): asynchronously gets the active browser tab in the current
+     window.
+   - render(): loads the active tab and saved collection, updates the status
+     and job count, enables/disables buttons, and renders up to 40 results.
+   - csvValue(value): wraps a CSV cell in quotes and doubles any quote
+     characters inside the value, so commas and quotes are exported safely.
+
+   Event handlers:
+   - Start button: gets the current tab and sends START_COLLECTION to the
+     service worker. Displays an error if the request fails.
+   - Stop button: sends STOP_COLLECTION to the service worker.
+   - Export button: reads saved jobs, creates a CSV download containing title,
+     company, location, experience, salary, posted date, and URL.
+   - chrome.storage.onChanged: refreshes the popup when collection data changes.
+   - Initial render: loads the current status and results when the popup opens.
+
+5. content.js
+   Role:
+   Runs in the Naukri page. Finds rendered job cards, extracts their visible
+   information, finds a next-page link, and sends the result to the service
+   worker.
+
+   Selector constants:
+   - JOB_CARD_SELECTORS lists candidate CSS selectors for Naukri job cards.
+   - JOB_LINK_SELECTORS lists candidate selectors for job-title links.
+   If Naukri changes its page layout, these selectors may need updating.
+
+   Functions:
+   - firstText(element, selectors): returns the first non-empty text found in
+     the element using the supplied selectors; returns an empty string if none
+     match.
+   - findJobCards(): returns elements matching the first job-card selector
+     that finds results, with a data-job-id fallback.
+   - extractJobs(): reads each card's title, company, location, experience,
+     salary, posted date, and URL. It removes URL fragments and duplicate links
+     within the page.
+   - isVisible(element): checks whether an element has a visible layout box.
+   - findNextPageUrl(): looks for a visible same-origin link labelled or marked
+     as the next page; returns an empty string if one is not found.
+   - sendToExtension(message): sends a message to the service worker. If
+     communication fails while collection is active, it stores a stopped
+     status and tells the user to reload the page.
+
+   Message behavior:
+   - On page load, sends PAGE_READY. The service worker uses it to resume an
+     active collection after it navigates to another result page.
+   - On COLLECT_PAGE, extracts the page data and sends PAGE_COLLECTED after a
+     short delay. A collecting flag prevents overlapping page reads.
+
+6. service-worker.js
+   Role:
+   Coordinates starting/stopping, page-to-page navigation, deduplication, and
+   persistent collection state. Runs outside the Naukri page.
+
+   Constants:
+   - STORAGE_KEY is the local storage entry for collection state.
+   - PAGE_DELAY_MS is the pause before opening the next page.
+
+   Functions:
+   - isNaukriUrl(value): validates that a URL uses HTTPS and a Naukri domain.
+   - normalizedUrl(value): removes the URL fragment and returns a normalized
+     URL string, used to detect pages that have already been visited.
+   - getState(): reads collection state from chrome.storage.local, or returns
+     an empty default state when none has been saved.
+   - saveState(state): writes the collection state to chrome.storage.local.
+   - startCollection(tabId): verifies the selected tab is a Naukri page,
+     initializes a new collection, and asks its content script to read it.
+   - collectPage(message, sender): accepts data from the active tab, prevents
+     processing the same page twice, appends unique jobs, stops when no cards
+     or next-page link is found, validates the next link, then navigates to it.
+   - handleMessage(message, sender): routes START_COLLECTION,
+     STOP_COLLECTION, PAGE_READY, and PAGE_COLLECTED messages. Start/stop
+     commands must come from the extension itself.
+
+   Message listener:
+   chrome.runtime.onMessage invokes handleMessage for extension messages and
+   returns a response to the sender. Errors are converted into an explicit
+   failure response.
+
+7. README.md
+   Role:
+   Gives quick installation instructions, usage steps, and notes about
+   permissions, page markup changes, and responsible use.
+
+   This file is documentation and has no functions.
+
+8. road map.txt
+   Role:
+   The project roadmap in the parent folder. Its first task describes collecting
+   search results; later tasks describe ranking, experience filtering, and
+   user-reviewed application assistance.
+
+   This file is documentation and has no functions.
+
+HOW COLLECTION STATE IS STORED
+------------------------------
+The service worker stores one object in chrome.storage.local under the key
+"naukriCollection". It contains:
+- active: whether collection is running.
+- tabId: the browser tab being collected.
+- jobs: collected job records.
+- visitedPages: normalized result-page URLs already read.
+- status: text shown in the popup.
+
+Each job record may contain title, company, location, experience, salary,
+posted, and url. Missing fields can be empty strings.
+
+MESSAGE FLOW
+------------
+1. The user clicks Collect all result pages in the popup.
+2. popup.js sends START_COLLECTION to service-worker.js.
+3. service-worker.js initializes storage and sends COLLECT_PAGE to content.js.
+4. content.js reads the visible result cards and sends PAGE_COLLECTED.
+5. service-worker.js saves unique jobs and, if a next link exists, navigates
+   the same tab to it.
+6. content.js on the newly loaded page sends PAGE_READY; the service worker
+   requests its results and repeats the process.
+7. The popup listens for storage changes and refreshes the displayed count and
+   list. The user can stop the run or download a CSV at any time.
+
+LIMITATIONS
+-----------
+- The user must first run a keyword search on Naukri; the extension does not
+  enter or submit keywords.
+- Collection depends on job-card and pagination markup that is visible on the
+  page. Naukri may change that markup.
+- Only same-site next-page links detected by content.js are followed.
+- Results are stored in this browser's extension storage and are not uploaded
+  to an external server.
+- This version does not rank/filter jobs or submit applications.

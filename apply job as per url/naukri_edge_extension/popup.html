@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Naukri CSV Apply Assistant</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <h1>Naukri Apply Assistant</h1>
+      <p class="hint">Import your job CSV. The extension uses your signed-in Edge profile.</p>
+
+      <label class="file-label" for="csv-file">Import CSV</label>
+      <input id="csv-file" type="file" accept=".csv,text/csv">
+
+      <div class="actions">
+        <button id="start" class="primary" disabled>Start / Resume</button>
+        <button id="next" disabled>Next job</button>
+        <button id="export" disabled>Export CSV</button>
+      </div>
+      <button id="stop" class="secondary" disabled>Stop run</button>
+
+      <p id="status" role="status">Import a CSV to begin.</p>
+      <section id="jobs" aria-live="polite"></section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

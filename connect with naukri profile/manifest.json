@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Naukri Job Search Assistant",
+  "version": "1.0.0",
+  "description": "Find keyword-matched Naukri jobs and optionally try one-step applications until one succeeds.",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["https://www.naukri.com/*"],
+  "action": {
+    "default_title": "Naukri Job Search Assistant",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.naukri.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

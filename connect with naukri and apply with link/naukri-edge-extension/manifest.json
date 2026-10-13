@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Naukri Search Collector",
+  "version": "0.1.0",
+  "description": "Collect visible job listings from a Naukri search and its result pages.",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["https://*.naukri.com/*"],
+  "action": {
+    "default_title": "Collect Naukri search jobs",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.naukri.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

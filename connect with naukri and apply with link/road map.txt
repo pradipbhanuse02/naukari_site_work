@@ -1,0 +1,65 @@
+## Roadmap: Edge extension for Naukri
+
+Assuming you mean an extension that works with the **Naukri.com website** 
+in Microsoft Edge, build it as a Chromium extension using **Manifest V3**. 
+Start with a small, user-controlled feature—such as saving job details or 
+filling application fields—before adding anything more complex.
+
+### 1. Define the first use case
+Choose one clear MVP feature, for example:
+
+1. Collect job cards from the Naukri search-results pages for the keywords entered on Naukri. The Edge extension reads visible results, follows next-page links, and stores unique job URLs locally.
+2. Rank the collected jobs by keyword match.
+3. Filter for jobs requiring less than 3 years of experience.
+4. Help the user apply to jobs that pass the filters, with the user reviewing and submitting each application.
+
+### 2. Check Naukri’s policies and integration options
+Before building, review Naukri’s current terms and any available developer or API 
+options. Avoid relying on private endpoints or automating actions in ways that 
+violate its terms. If no official API is available, limit page interaction to 
+user-initiated features and test carefully when the site changes.
+
+### 3. Set up the extension
+Create a small project with:
+
+- `manifest.json` — extension name, permissions, scripts, and popup
+- A popup or side panel — controls and saved items
+- A content script — interacts with Naukri pages when enabled
+- A service worker — handles extension events and storage
+
+Use the minimum permissions possible; request access to Naukri pages only if the feature needs it.
+
+### 4. Build the MVP
+For a job-saving MVP:
+
+1. Detect a supported job page.
+2. Let the user click **Save job**.
+3. Extract only the necessary details, such as title, company, location, and URL.
+4. Store the result locally with `chrome.storage.local`.
+5. Show saved jobs in the extension popup, with options to open or remove them.
+
+Keep page-specific selectors isolated so they’re easier to update if Naukri changes its page layout.
+
+### 5. Add a connection to your app, if needed
+If “Naukri app” means a separate app you’re building, decide how the extension will send data to it:
+
+- **Web app/backend:** send data to an authenticated HTTPS API.
+- **Local desktop app:** consider Native Messaging, which requires a separately installed host application.
+- **Same-browser app:** a backend API is usually simpler and more reliable than trying to share page state directly.
+
+Use authentication, validate incoming data, and avoid sending resumes or personal details unless the user explicitly opts in.
+
+### 6. Test on Edge
+Test the extension on:
+
+- Job listings, job details, and application pages
+- Logged-in and logged-out states
+- Pages with missing or differently formatted details
+- Edge’s extension reload/update flow
+
+Also verify that it does not collect data or run on unrelated sites.
+
+### 7. Package and publish
+Load the extension locally through `edge://extensions` with **Developer mode** enabled. Once it works, prepare screenshots, a privacy policy, and a clear permissions explanation, then submit it through the Microsoft Edge Add-ons developer portal.
+
+**Suggested first milestone:** a local-only “Save job” extension. It’s simpler to build and test than connecting to another app or automating application submission.
